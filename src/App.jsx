@@ -1,48 +1,82 @@
-import React,{useState,useEffect,useCallback,useRef} from 'react';
+import React,{useState,useEffect,useCallback,useRef,useMemo} from 'react';
 import {useAuth0} from '@auth0/auth0-react';
+import Icon,{FoxMark} from './Icon.jsx';
 const empty={titulo:'',descricao:'',prioridade:'MEDIA',emailCriador:''};
+const priorityNames={ALTA:'Alta prioridade',MEDIA:'Média prioridade',BAIXA:'Baixa prioridade'};
+const priorityOrder={ALTA:0,MEDIA:1,BAIXA:2};
+const tips=['Uma tarefa bem definida já é meio caminho andado.','Quebre uma ideia grande em pequenos próximos passos.','Prioridade é escolher o que merece sua atenção agora.'];
+function initials(name=''){return name.trim().split(/\s+/).filter(Boolean).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'EU';}
+function normalize(text=''){return text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR');}
 export default function App(){
  const {isLoading,isAuthenticated,user,error:authError,loginWithRedirect,logout,getAccessTokenSilently}=useAuth0();
  const [form,setForm]=useState(empty),[items,setItems]=useState([]),[error,setError]=useState(''),[message,setMessage]=useState(''),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
- const lock=useRef(false);
+ const [query,setQuery]=useState(''),[priority,setPriority]=useState('TODAS'),[tab,setTab]=useState('todas'),[sort,setSort]=useState('prioridade'),[tip,setTip]=useState(0);
+ const lock=useRef(false),dialog=useRef(null),titleInput=useRef(null);
+ const firstName=user?.given_name||user?.name?.split(' ')[0]||'você';
  const request=useCallback(async(path,options={})=>{
   const token=await getAccessTokenSilently();
   const response=await fetch(`/api${path}`,{...options,headers:{Authorization:`Bearer ${token}`,...(options.body?{'Content-Type':'application/json'}:{})}});
   const data=await response.json().catch(()=>null);
-  if(!response.ok)throw new Error(response.status===401?'Sessão inválida: saia e entre novamente.':response.status===403?'Acesso recusado. Confira Auth0 e configuração da API.':data?.fields?Object.entries(data.fields).map(([k,v])=>`${k}: ${v}`).join('; '):data?.message||`Falha na API (${response.status}). Confira o proxy e o backend.`);
+  if(!response.ok)throw new Error(response.status===401?'Sua sessão expirou. Saia e entre novamente.':response.status===403?'Não foi possível acessar suas tarefas. Tente entrar novamente.':data?.fields?Object.entries(data.fields).map(([k,v])=>`${k}: ${v}`).join('; '):data?.message||'Não foi possível concluir a ação. Tente novamente.');
   return data;
  },[getAccessTokenSilently]);
  const load=useCallback(async(active=()=>true)=>{
   setLoading(true);
-  try{const data=await request('/tarefa');if(!Array.isArray(data))throw new Error('Resposta inesperada: confira o destino /api no proxy.');if(active())setItems(data);}
+  try{const data=await request('/tarefa');if(!Array.isArray(data))throw new Error('Não foi possível carregar as tarefas. Tente novamente.');if(active()){setItems(data);setError('');}}
   catch(e){if(active())setError(e.message);}finally{if(active())setLoading(false);}
  },[request]);
- useEffect(()=>{if(!isAuthenticated)return;let active=true;setForm(f=>({...f,emailCriador:user?.email||''}));load(()=>active);return()=>{active=false;};},[isAuthenticated,user?.email,load]);
+ useEffect(()=>{if(!isAuthenticated){dialog.current?.close();return;}let active=true;setForm(f=>({...f,emailCriador:user?.email||''}));load(()=>active);return()=>{active=false;};},[isAuthenticated,user?.email,load]);
+ useEffect(()=>{if(!message)return;const id=setTimeout(()=>setMessage(''),5500);return()=>clearTimeout(id);},[message]);
+ const openForm=()=>{if(!isAuthenticated){loginWithRedirect();return;}dialog.current?.showModal();titleInput.current?.focus();};
+ const scrollToTasks=()=>document.getElementById('tarefas')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
  async function create(event){
   event.preventDefault();if(lock.current)return;lock.current=true;setBusy(true);setError('');setMessage('');
-  try{await request('/tarefa',{method:'POST',body:JSON.stringify(form)});setForm({...empty,emailCriador:user?.email||''});setMessage('Tarefa criada.');await load();}
+  try{await request('/tarefa',{method:'POST',body:JSON.stringify(form)});setForm({...empty,emailCriador:user?.email||''});dialog.current?.close();setMessage('Tarefa criada. Mais um passo para o seu projeto.');await load();}
   catch(e){setError(e.message);}finally{lock.current=false;setBusy(false);}
  }
  async function remove(item){
-  if(lock.current||!window.confirm(`Excluir a tarefa “${item.titulo}”?`))return;lock.current=true;setBusy(true);setError('');setMessage('');
+  if(lock.current||!window.confirm(`Excluir a tarefa “${item.titulo}”? Esta ação não pode ser desfeita.`))return;lock.current=true;setBusy(true);setError('');setMessage('');
   try{await request(`/tarefa?id=${encodeURIComponent(item.id)}`,{method:'DELETE'});setMessage('Tarefa excluída.');await load();}
   catch(e){setError(e.message);}finally{lock.current=false;setBusy(false);}
  }
- if(isLoading)return <main><p>Carregando sessão…</p></main>;
- return <main><header><div><span className="eyebrow">GERENCIAMENTO DE PROJETO</span><h1>Tarefas</h1></div>{isAuthenticated&&<button className="secondary" onClick={()=>logout({logoutParams:{returnTo:window.location.origin}})}>Sair</button>}</header>
-  {authError&&<p role="alert">{authError.message}</p>}
-  {!isAuthenticated?<section><h2>Organize o trabalho do projeto</h2><p>Entre para criar, listar e excluir tarefas.</p><button onClick={()=>loginWithRedirect()}>Entrar com Auth0</button><button className="secondary" onClick={()=>loginWithRedirect({authorizationParams:{screen_hint:'signup'}})}>Criar conta</button></section>:<>
-   <p>Olá, {user?.name||user?.email}.</p>{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}
-   <section><h2>Nova tarefa</h2><form onSubmit={create}>
-    <label>Título<input required maxLength="150" value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})}/></label>
-    <label>Descrição<textarea required maxLength="4000" value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})}/></label>
-    <label>Prioridade<select value={form.prioridade} onChange={e=>setForm({...form,prioridade:e.target.value})}><option value="BAIXA">Baixa</option><option value="MEDIA">Média</option><option value="ALTA">Alta</option></select></label>
-    <label>Email de quem criou<input type="email" required maxLength="254" value={form.emailCriador} onChange={e=>setForm({...form,emailCriador:e.target.value})}/></label>
-    <button disabled={busy}>{busy?'Aguarde…':'Criar tarefa'}</button>
-   </form></section>
-   <section><div className="section-heading"><h2>Tarefas do projeto</h2><button className="secondary" disabled={loading||busy} onClick={()=>{setError('');load();}}>Atualizar lista</button></div>
-    {loading?<p role="status">Carregando tarefas…</p>:items.length===0?<p>Nenhuma tarefa cadastrada.</p>:<div className="table"><table><thead><tr><th>Título</th><th>Descrição</th><th>Prioridade</th><th>Criado por</th><th>Ação</th></tr></thead><tbody>{items.map(item=><tr key={item.id}><td>{item.titulo}</td><td>{item.descricao}</td><td><span className={`priority ${item.prioridade.toLowerCase()}`}>{item.prioridade==='MEDIA'?'Média':item.prioridade==='ALTA'?'Alta':'Baixa'}</span></td><td>{item.emailCriador}</td><td><button className="danger" disabled={busy} onClick={()=>remove(item)}>Excluir</button></td></tr>)}</tbody></table></div>}
-   </section>
-  </>}
- </main>;
+ const high=items.filter(i=>i.prioridade==='ALTA').length;
+ const mine=items.filter(i=>i.emailCriador?.toLowerCase()===user?.email?.toLowerCase()).length;
+ const visible=useMemo(()=>items.filter(i=>(priority==='TODAS'||i.prioridade===priority)&&(tab!=='minhas'||i.emailCriador?.toLowerCase()===user?.email?.toLowerCase())&&normalize(`${i.titulo} ${i.descricao} ${i.emailCriador}`).includes(normalize(query.trim()))).sort((a,b)=>sort==='prioridade'?(priorityOrder[a.prioridade]-priorityOrder[b.prioridade]||a.titulo.localeCompare(b.titulo,'pt-BR')):a.titulo.localeCompare(b.titulo,'pt-BR')),[items,priority,tab,user?.email,query,sort]);
+ if(isLoading)return <div className="boot"><div className="brand-symbol"><FoxMark/></div><p>Preparando seu espaço<span className="loading-dots">…</span></p></div>;
+ return <div className="app-shell">
+  <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <aside className="sidebar" aria-label="Navegação principal">
+   <a className="brand" href="#conteudo" aria-label="Foco, início"><span className="brand-symbol"><FoxMark/></span><span>foco<span className="brand-dot">.</span></span></a>
+   <span className="nav-caption">SEU WORKSPACE</span>
+   <nav><a className="nav-link active" href="#conteudo" aria-current="page"><Icon name="grid"/>Visão geral<span className="nav-active-dot"/></a><a className="nav-link" href="#tarefas"><Icon name="tasks"/>Tarefas<span className="nav-count">{isAuthenticated?items.length:'—'}</span></a><button className="nav-link" onClick={openForm}><Icon name="plus"/>Nova tarefa</button></nav>
+   <div className="sidebar-note"><span className="tiny-star">✳</span><p>Grandes projetos.<br/><strong>Pequenos passos.</strong></p><span>Um espaço para fazer acontecer.</span></div>
+   <div className="sidebar-bottom"><span className="status-dot"/><span>{isAuthenticated?'Seu espaço está conectado':'Seu próximo projeto começa aqui'}</span></div>
+  </aside>
+  <div className="main-shell">
+   <header className="topbar"><div className="breadcrumb"><span className="mobile-brand"><FoxMark/></span><Icon name="folder" size={17}/><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>Visão geral</strong></div><div className="topbar-right"><span className="today-tag"><Icon name="sun" size={16}/>Um bom dia para criar</span>{isAuthenticated?<><span className="user-avatar" title={user?.name||user?.email}>{initials(user?.name||user?.email)}</span><button className="icon-button logout" title="Sair da conta" aria-label="Sair da conta" onClick={()=>logout({logoutParams:{returnTo:window.location.origin}})}><Icon name="logout" size={18}/></button></>:<button className="button text-button" onClick={()=>loginWithRedirect()}>Entrar<Icon name="arrow" size={17}/></button>}</div></header>
+   <main id="conteudo">
+    <div className="page-intro"><div><div className="eyebrow"><span/>SEU PROJETO, EM MOVIMENTO</div><h1>{isAuthenticated?`Vamos nessa, ${firstName}.`:'Ideias merecem sair do papel.'}</h1><p>{isAuthenticated?'Tudo o que precisa de você, em um só lugar.':'Organize o que importa. Dê espaço ao que vem depois.'}</p></div>{isAuthenticated&&<button className="button button-primary intro-create" onClick={openForm}><Icon name="plus" size={19}/>Nova tarefa</button>}</div>
+    {(error||authError)&&<div className="alert" role="alert"><strong>Precisamos da sua atenção.</strong><span>{error||authError.message}</span>{isAuthenticated&&<button onClick={()=>load()} className="alert-retry" disabled={loading}>Tentar novamente</button>}</div>}
+    <section className="hero" aria-label="Inspiração para seu projeto"><div className="hero-grid"/><div className="hero-content"><span className="hero-pill"><Icon name="spark" size={14}/> UM PASSO DE CADA VEZ</span><h2>Menos ruído.<br/>Mais <span>execução.</span></h2><p>{isAuthenticated?'Seu próximo grande resultado começa com uma tarefa pequena. Vamos encontrar a primeira?':'Um lugar para suas tarefas, suas prioridades e aquela vontade de fazer acontecer.'}</p><button className="hero-cta" onClick={isAuthenticated?scrollToTasks:()=>loginWithRedirect()}>{isAuthenticated?'Explorar minhas tarefas':'Entrar e começar'}<span><Icon name="arrow" size={19}/></span></button></div><div className="hero-art"><div className="fox-orbit orbit-one"/><div className="fox-orbit orbit-two"/><span className="art-spark spark-one">✳</span><span className="art-spark spark-two">+</span><div className="fox-floor"/><img className="fox-mascot" src="/lume-fox.svg" alt="Lume, uma raposinha vermelha de olhos curiosos e cauda enrolada"/><div className="mascot-tag"><span className="status-dot"/><span>Lume <span>· sua dose de foco</span></span></div></div></section>
+    {isAuthenticated?<>
+     <section className="metrics" aria-label="Resumo das tarefas"><div className="metric"><span className="metric-icon"><Icon name="tasks"/></span><div><span className="metric-label">Tarefas no projeto</span><strong>{loading?'—':String(items.length).padStart(2,'0')}</strong></div><span className="metric-foot">Ideias ganhando forma</span></div><div className="metric"><span className="metric-icon red"><Icon name="flag"/></span><div><span className="metric-label">Prioridade alta</span><strong>{loading?'—':String(high).padStart(2,'0')}</strong></div><span className="metric-foot">O que pede atenção primeiro</span></div><div className="lume-tip"><span className="tip-label"><Icon name="spark" size={15}/> UM TOQUE DA LUME</span><p>{tips[tip]}</p><button className="tip-next" onClick={()=>setTip((tip+1)%tips.length)} aria-label="Ver próxima dica da Lume"><Icon name="arrow" size={18}/></button></div></section>
+     <section id="tarefas" className="task-section"><div className="section-heading"><div><div className="eyebrow muted">DO PLANO À PRÁTICA</div><h2>Seu próximo passo<span className="heading-dot">.</span></h2></div><button className="button button-outline" disabled={loading||busy} onClick={()=>load()}><Icon name="refresh" size={16} className={loading?'spin':''}/><span>Atualizar</span></button></div>
+      <div className="task-toolbar"><div className="tabs" aria-label="Visualização"><button className={tab==='todas'?'selected':''} aria-pressed={tab==='todas'} onClick={()=>setTab('todas')}>Todas<span>{items.length}</span></button><button className={tab==='minhas'?'selected':''} aria-pressed={tab==='minhas'} onClick={()=>setTab('minhas')}>Criadas por mim<span>{mine}</span></button></div><div className="filters"><label className="search-box"><Icon name="search" size={17}/><input aria-label="Buscar tarefas" placeholder="Buscar uma tarefa…" value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button className="clear-search" onClick={()=>setQuery('')} type="button" aria-label="Limpar busca"><Icon name="close" size={14}/></button>}</label><label className="select-filter"><select aria-label="Filtrar por prioridade" value={priority} onChange={e=>setPriority(e.target.value)}><option value="TODAS">Prioridade</option><option value="ALTA">Alta</option><option value="MEDIA">Média</option><option value="BAIXA">Baixa</option></select><Icon name="chevron" size={14}/></label></div></div>
+      <div className="list-meta"><span>{loading?'Carregando suas tarefas…':`${visible.length} ${visible.length===1?'tarefa encontrada':'tarefas encontradas'}`}</span><label>Ordenar por<select aria-label="Ordenar tarefas" value={sort} onChange={e=>setSort(e.target.value)}><option value="prioridade">Prioridade</option><option value="titulo">Título A–Z</option></select></label></div>
+      {loading?<div className="task-grid" role="status" aria-label="Carregando tarefas">{[0,1,2].map(i=><div className="skeleton-card" key={i}><span/><span/><span/></div>)}</div>:visible.length?<div className="task-grid">{visible.map((item,index)=><article className={`task-card priority-${item.prioridade.toLowerCase()}`} key={item.id}><div className="task-card-top"><span className={`priority-pill ${item.prioridade.toLowerCase()}`}><span/>{priorityNames[item.prioridade]}</span><span className="task-index">{String(index+1).padStart(2,'0')}</span></div><h3>{item.titulo}</h3><p className="task-description">{item.descricao}</p><div className="task-card-bottom"><div className="task-author"><span className="author-avatar">{initials(item.emailCriador.split('@')[0])}</span><span title={item.emailCriador}>{item.emailCriador}</span></div><button className="icon-button delete-button" disabled={busy} aria-label={`Excluir tarefa ${item.titulo}`} title="Excluir tarefa" onClick={()=>remove(item)}><Icon name="trash" size={17}/></button></div></article>)}</div>:<div className="empty-state"><div className="empty-fox"><img src="/lume-fox.svg" alt=""/></div><h3>{items.length?'Nenhuma tarefa por aqui com esse filtro.':'Todo grande projeto começa assim.'}</h3><p>{items.length?'Experimente outra busca ou veja todas as tarefas.':'Uma ideia, uma primeira tarefa e espaço para fazer acontecer.'}</p>{items.length?<button className="button button-outline" onClick={()=>{setQuery('');setPriority('TODAS');setTab('todas');}}>Limpar filtros<Icon name="arrow" size={16}/></button>:<button className="button button-primary" onClick={openForm}><Icon name="plus" size={17}/>Criar primeira tarefa</button>}</div>}
+     </section>
+    </>:<section id="tarefas" className="welcome-section"><div><span className="eyebrow muted">DEIXE O PRÓXIMO PASSO CLARO</span><h2>Seu foco tem<br/>um novo lugar.</h2><p>Crie tarefas, organize prioridades e acompanhe as ideias do seu projeto. A Lume te faz companhia no caminho.</p><div className="welcome-actions"><button className="button button-primary" onClick={()=>loginWithRedirect()}>Entrar no meu espaço<Icon name="arrow" size={18}/></button><button className="button button-outline" onClick={()=>loginWithRedirect({authorizationParams:{screen_hint:'signup'}})}>Criar conta</button></div></div><div className="welcome-features">{[['tasks','Um espaço, todas as tarefas','Do primeiro rascunho ao próximo passo.'],['flag','Prioridades que fazem sentido','Encontre o que precisa da sua atenção.'],['spark','Leve para usar. Pronto para criar.','Menos distração para fazer mais acontecer.']].map(([icon,title,text])=><div key={title}><span className="feature-icon"><Icon name={icon}/></span><div><h3>{title}</h3><p>{text}</p></div></div>)}</div></section>}
+    <footer className="page-footer"><span><FoxMark/><strong>foco.</strong><span>Um pequeno passo faz a diferença.</span></span><span>Feito para fazer acontecer <span className="red-dot">●</span></span></footer>
+   </main>
+  </div>
+  {message&&<div className="toast" role="status"><span><Icon name="check" size={18}/></span>{message}<button className="icon-button" onClick={()=>setMessage('')} aria-label="Fechar mensagem"><Icon name="close" size={16}/></button></div>}
+  {isAuthenticated&&<dialog className="task-dialog" aria-labelledby="task-dialog-title" ref={dialog} onCancel={e=>{if(busy)e.preventDefault();}} onClick={e=>{if(e.target===dialog.current&&!busy)dialog.current.close();}}><div className="dialog-content"><div className="dialog-heading"><div><span className="eyebrow muted">TIRE UMA IDEIA DO PAPEL</span><h2 id="task-dialog-title">Um novo passo<span className="heading-dot">.</span></h2></div><button className="icon-button" aria-label="Fechar formulário" disabled={busy} onClick={()=>dialog.current.close()}><Icon name="close"/></button></div><p className="dialog-description">Dê um nome, defina a prioridade e deixe o resto fluir.</p><form onSubmit={create}>
+   <label>Título da tarefa<input ref={titleInput} required maxLength="150" placeholder="O que você quer fazer acontecer?" value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})}/></label>
+   <label>Descrição<textarea required maxLength="4000" placeholder="Conte um pouco mais sobre esse próximo passo…" value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})}/></label>
+   <fieldset className="priority-picker"><legend>Qual é a prioridade?</legend><div>{['BAIXA','MEDIA','ALTA'].map(value=><label className={`priority-choice ${value.toLowerCase()} ${form.prioridade===value?'chosen':''}`} key={value}><input type="radio" name="prioridade" value={value} checked={form.prioridade===value} onChange={()=>setForm({...form,prioridade:value})}/><span className="choice-dot"/>{value==='MEDIA'?'Média':value==='ALTA'?'Alta':'Baixa'}{form.prioridade===value&&<Icon name="check" size={14}/>}</label>)}</div></fieldset>
+   <label>Email de quem criou<span className="input-with-icon"><Icon name="mail" size={17}/><input type="email" required maxLength="254" value={form.emailCriador} onChange={e=>setForm({...form,emailCriador:e.target.value})}/></span></label>
+   {error&&<p className="dialog-error" role="alert">{error}</p>}
+   <div className="form-actions"><button type="button" className="button text-button" disabled={busy} onClick={()=>dialog.current.close()}>Cancelar</button><button className="button button-primary" disabled={busy}>{busy?'Criando…':'Criar tarefa'}<Icon name={busy?'refresh':'arrow'} size={17} className={busy?'spin':''}/></button></div>
+  </form></div></dialog>}
+ </div>;
 }

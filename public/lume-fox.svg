@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 400" fill="none">
+<defs>
+ <linearGradient id="fur" x1="150" y1="80" x2="315" y2="325" gradientUnits="userSpaceOnUse"><stop stop-color="#FF694A"/><stop offset="1" stop-color="#DB2528"/></linearGradient>
+ <linearGradient id="tail" x1="327" y1="201" x2="227" y2="350" gradientUnits="userSpaceOnUse"><stop stop-color="#FF7552"/><stop offset="1" stop-color="#DF292E"/></linearGradient>
+ <linearGradient id="cream" x1="190" y1="150" x2="236" y2="325" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF8EA"/><stop offset="1" stop-color="#EADBC6"/></linearGradient>
+ <radialGradient id="shade"><stop stop-color="#000" stop-opacity=".25"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+</defs>
+<ellipse cx="223" cy="358" rx="139" ry="22" fill="url(#shade)"/>
+<!-- Tail curls around her paws. -->
+<path d="M249 319C318 323 361 277 349 214C344 189 328 172 307 162C318 200 292 220 269 240C234 268 212 302 249 319Z" fill="url(#tail)"/>
+<path d="M307 162C331 172 346 194 350 220C334 217 328 227 318 228C308 211 300 202 303 191C306 180 308 171 307 162Z" fill="#FFF3DF"/>
+<!-- Body and cream bib. -->
+<path d="M163 216C150 240 139 270 145 309C146 334 160 345 181 345H251C268 336 267 321 254 302C246 285 249 246 234 222L163 216Z" fill="url(#fur)"/>
+<path d="M184 229L208 247L232 227C247 257 247 287 235 312C225 331 198 334 184 315C174 294 176 259 184 229Z" fill="url(#cream)"/>
+<path d="M157 305C145 321 151 344 170 346H192C192 334 181 329 176 327L173 307" fill="#982D31"/>
+<path d="M229 310L224 333C222 341 226 347 234 348H259C264 334 253 328 248 326L248 309" fill="#982D31"/>
+<path d="M182 263C176 290 178 320 190 334C196 340 207 338 209 331L211 284" fill="#EE4534"/>
+<path d="M191 326C197 323 206 324 209 331C207 342 194 343 189 334Z" fill="#A83132"/>
+<!-- Exaggerated ears and head, original geometric mascot. -->
+<path d="M149 166C129 129 127 80 145 49C174 66 189 91 195 113L149 166Z" fill="url(#fur)"/>
+<path d="M143 69C137 94 141 120 151 137L175 113C166 94 155 78 143 69Z" fill="#662E37"/>
+<path d="M237 114C249 82 270 66 296 58C310 96 300 136 281 164L237 114Z" fill="url(#fur)"/>
+<path d="M290 78C274 87 264 99 258 115L281 137C291 117 294 97 290 78Z" fill="#662E37"/>
+<path d="M157 131C182 109 231 106 263 125C285 139 302 171 292 197C282 224 248 246 214 250C181 246 145 231 134 204C125 178 137 150 157 131Z" fill="url(#fur)"/>
+<!-- Cream cheeks make a recognizable fox mask. -->
+<path d="M137 174C151 171 166 177 180 190C191 200 200 203 212 209C201 217 190 227 182 240C158 233 139 219 134 203C130 192 131 184 137 174Z" fill="url(#cream)"/>
+<path d="M291 174C275 171 262 178 249 191C237 203 225 206 212 209C228 216 237 227 245 241C267 231 285 219 292 200C295 189 294 182 291 174Z" fill="url(#cream)"/>
+<path d="M180 231C194 215 205 208 214 209C224 210 237 221 246 236C237 244 226 249 214 250C200 248 189 242 180 231Z" fill="#FFF7E8"/>
+<g fill="#30262B"><path d="M172 175C172 168 176 164 181 165C186 165 189 170 188 176C187 183 183 186 179 185C175 184 172 181 172 175Z"/><path d="M246 174C246 168 250 164 255 165C260 166 262 171 261 177C260 183 256 186 252 185C248 184 246 180 246 174Z"/></g>
+<g fill="#FFF"><circle cx="178" cy="170" r="2.2"/><circle cx="252" cy="170" r="2.2"/></g>
+<path d="M204 207C210 203 219 203 225 207C229 211 218 220 214 220C209 220 200 211 204 207Z" fill="#30262B"/>
+<path d="M214 219V226M214 226C208 231 201 230 198 226M214 226C220 231 227 230 230 226" stroke="#744442" stroke-width="2.5" stroke-linecap="round"/>
+<ellipse cx="157" cy="199" rx="8" ry="4" fill="#F5AA9B" opacity=".6"/><ellipse cx="274" cy="199" rx="8" ry="4" fill="#F5AA9B" opacity=".6"/>
+<path d="M184 142C190 137 197 136 202 136M235 137C241 137 247 139 252 142" stroke="#FFAE80" stroke-width="4" stroke-linecap="round"/>
+<!-- Tail rests in front, with a soft cream tip. -->
+<path d="M321 301C302 337 265 353 222 349C207 348 198 344 192 337C212 314 255 310 272 308C291 306 307 301 321 301Z" fill="url(#tail)"/>
+<path d="M192 337C207 320 229 315 250 313C249 326 241 335 229 337C232 342 230 346 226 350C210 351 199 346 192 337Z" fill="url(#cream)"/>
+</svg>
